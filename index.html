@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-width=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EPTA">
+  <meta name="theme-color" content="#f0f4f8">
+  <title>EPTA Simulator</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #f0f4f8; }
+    body { font-family: 'Pretendard', sans-serif; color: #333; display: flex; justify-content: center; align-items: center; padding: 20px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .container { width: 100%; max-width: 600px; background: white; padding: 35px; border-radius: 16px; box-shadow: 0 15px 35px rgba(0,0,0,0.08); height: auto; max-height: calc(100vh - 40px); overflow-y: auto; display: flex; flex-direction: column; }
+    h1 { color: #2c3e50; text-align: center; margin-top: 0; margin-bottom: 30px; font-size: 2.2rem; }
+    h2 { color: #2980b9; margin-bottom: 25px; border-bottom: 2px solid #ecf0f1; padding-bottom: 15px; }
+    .section { display: none; animation: fadeIn 0.4s ease-in-out; padding-bottom: 5px;}
+    .active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .form-group { margin-bottom: 25px; }
+    label { display: block; margin-bottom: 10px; font-weight: bold; color: #34495e; font-size: 1.1rem; }
+    input, select, textarea { width: 100%; padding: 16px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 17px; background-color: #f8fafc; transition: all 0.2s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #3498db; background-color: #fff; box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.1); }
+    textarea { resize: vertical; min-height: 140px; }
+    button { width: 100%; padding: 18px; background-color: #3498db; color: white; border: none; border-radius: 10px; font-size: 17px; font-weight: bold; cursor: pointer; margin-top: 15px; transition: background-color 0.2s, transform 0.1s; flex-shrink: 0; }
+    button:active { transform: scale(0.98); }
+    button:hover { background-color: #2980b9; }
+    .btn-secondary { background-color: #95a5a6; color: white; }
+    .btn-secondary:hover { background-color: #7f8c8d; }
+    .btn-success { background-color: #2ecc71; }
+    .btn-success:hover { background-color: #27ae60; }
+    .record-btn { background-color: #e74c3c; box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3); margin-top: 25px;}
+    .record-btn:hover { background-color: #c0392b; }
+    .btn-group { display: flex; gap: 15px; margin-top: 30px; flex-shrink: 0; }
+    .btn-group button { flex: 1; margin-top: 0; }
+    .status { margin-top: 15px; text-align: center; font-weight: bold; color: #e67e22; font-size: 16px; }
+    .loading { text-align: center; color: #7f8c8d; display: none; margin: 40px 0; font-size: 20px; font-weight: bold; }
+    .question-box { background: #f0f7ff; padding: 25px; border-left: 6px solid #3498db; border-radius: 0 12px 12px 0; margin-bottom: 25px; font-size: 1.15rem; color: #2c3e50; font-weight: 600; line-height: 1.6; }
+    .result-box { background-color: #f8f9fa; padding: 30px; border-radius: 16px; margin-top: 30px; border: 1px solid #e9ecef; }
+    .result-box p { line-height: 1.7; margin-bottom: 18px; font-size: 1.05rem; }
+    @media (max-width: 600px) {
+      body { padding: 0; background-color: white; align-items: flex-start; }
+      .container { padding: 30px 25px; border-radius: 0; box-shadow: none; max-height: none; height: 100%; }
+      h1 { font-size: 1.8rem; margin-bottom: 25px; }
+      .btn-group { flex-direction: column; gap: 15px; }
+      .btn-group button { width: 100%; flex: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>✈️ EPTA Simulator</h1>
+  <div id="screen-login" class="section active">
+    <div class="form-group"><label>사번 (Employee ID)</label><input type="text" id="empId" placeholder="예: TS12345" required></div>
+    <div class="form-group"><label>목표 등급</label><select id="targetGrade"><option value="4">Level 4 (Operational)</option><option value="5">Level 5 (Extended)</option><option value="6">Level 6 (Expert)</option></select></div>
+    <div class="form-group"><label>학습 파트</label><select id="studyPart"><option value="Part 1">Part 1 (교신 내용 이해 및 응대)</option><option value="Part 2">Part 2 (비정상/비상상황 롤플레이)</option></select></div>
+    <button onclick="startTest()" style="margin-top: 40px; font-size: 1.2rem;">🚀 시험 시작하기</button>
+  </div>
+
+  <div id="screen-test" class="section">
+    <h2 id="part-title">Test Part</h2>
+    <div id="loading-question" class="loading">📡 AI 시험관이 문제를 출제 중입니다...</div>
+    <div id="question-area" style="display: none;">
+      <p style="color:#7f8c8d; margin-bottom: 10px; font-size: 1.1rem;"><strong>[시험관 질문]</strong></p>
+      <div id="question-text" class="question-box"></div>
+      <button onclick="playQuestion()" class="btn-success" style="margin-top: 0;">🔊 질문 다시 듣기</button>
+      <p style="margin-top: 40px; color:#7f8c8d; margin-bottom: 10px; font-size: 1.1rem;"><strong>[나의 답변]</strong></p>
+      <textarea id="user-answer" placeholder="녹음 버튼을 누르고 영어로 말하거나, 직접 타이핑하세요."></textarea>
+      <button id="record-btn" class="record-btn" onclick="toggleRecording()">🎤 녹음 시작 / 중지</button>
+      <div id="record-status" class="status"></div>
+      <div class="btn-group">
+        <button onclick="submitAnswer()">✅ 제출 및 평가받기</button>
+        <button onclick="skipToModelAnswer()" class="btn-secondary">💡 모범 답안만 보기</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-result" class="section">
+    <h2>📊 평가 결과</h2>
+    <div id="loading-result" class="loading">🤖 AI가 데이터를 분석하고 있습니다...</div>
+    <div id="result-area" class="result-box" style="display: none;">
+      <div id="eval-section">
+        <p><strong>🎯 평가 점수:</strong> <span id="res-score" style="color: #e74c3c; font-weight: bold; font-size: 1.3rem; display: block; margin-top: 8px;"></span></p>
+        <p><strong>📝 상세 피드백:</strong> <br><span id="res-feedback" style="display: block; margin-top: 8px;"></span></p>
+        <hr style="border: 0; border-top: 2px solid #e9ecef; margin: 25px 0;">
+      </div>
+      <p style="color:#2980b9;"><strong>📘 모범 답안:</strong> <br><span id="res-model" style="font-weight:bold; display: block; margin-top: 8px; white-space: pre-wrap;"></span></p>
+      <p style="color:#27ae60;"><strong>🔑 주요 암기 표현:</strong> <br><span id="res-expr" style="display: block; margin-top: 8px;"></span></p>
+      <div class="btn-group">
+        <button onclick="continueTest()" class="btn-success">➡️ 다음 문제 계속</button>
+        <button onclick="goHome()" class="btn-secondary">🏠 처음으로</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 👇👇 여기에 복사해 둔 GAS 웹 앱 URL을 붙여넣으세요! 👇👇
+  const GAS_API_URL = "https://script.google.com/a/macros/koreanair.com/s/AKfycbx6H-CfKmoeby91zFHjDDmvVHadNiVYgiyx5aqPTpNWW9YPrQ2kXLYk5c9PA0GFwhf_aQ/exec"; 
+
+  let currentEmpId = ''; let currentGrade = ''; let currentPart = ''; let currentQuestion = '';
+  
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition; let isRecording = false;
+
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US'; recognition.interimResults = false; recognition.maxAlternatives = 1;
+    recognition.onresult = function(event) { document.getElementById('user-answer').value += event.results[0][0].transcript + " "; };
+    recognition.onend = function() {
+      isRecording = false;
+      document.getElementById('record-btn').innerText = "🎤 녹음 시작 / 중지";
+      document.getElementById('record-status').innerText = "녹음이 완료되었습니다.";
+    };
+  }
+
+  function showScreen(screenId) {
+    document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+  }
+
+  // === 통신 함수(Fetch API) 교체 ===
+  async function callBackend(data, onSuccess, onErrorFallback) {
+    try {
+      const response = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // CORS 우회를 위해 text/plain 사용
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+      if (result.status === "success") onSuccess(result.data);
+      else throw new Error(result.message);
+    } catch (error) {
+      onErrorFallback(error);
+    }
+  }
+
+  function startTest() {
+    currentEmpId = document.getElementById('empId').value;
+    currentGrade = document.getElementById('targetGrade').value;
+    currentPart = document.getElementById('studyPart').value;
+    if (!currentEmpId) return alert("사번을 입력해주세요!");
+
+    document.getElementById('part-title').innerText = currentPart + " Test 진행 중";
+    showScreen('screen-test');
+    document.getElementById('loading-question').style.display = 'block';
+    document.getElementById('question-area').style.display = 'none';
+    document.getElementById('record-status').innerText = ''; 
+
+    // 새로운 통신 방식으로 문제 생성 요청
+    callBackend(
+      { action: "generate", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart },
+      onQuestionReceived,
+      onError
+    );
+  }
+
+  function onQuestionReceived(question) {
+    currentQuestion = question;
+    document.getElementById('loading-question').style.display = 'none';
+    document.getElementById('question-area').style.display = 'block';
+    document.getElementById('question-text').innerText = question;
+    document.getElementById('user-answer').value = '';
+    playQuestion();
+  }
+
+  function playQuestion() {
+    if ('speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(currentQuestion);
+      utterance.lang = 'en-US'; utterance.rate = 0.9; 
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  function toggleRecording() {
+    if (!SpeechRecognition) return alert("이 브라우저에서는 녹음을 지원하지 않습니다.");
+    if (isRecording) { recognition.stop(); } 
+    else {
+      recognition.start(); isRecording = true;
+      document.getElementById('record-btn').innerText = "⏹️ 녹음 중지";
+      document.getElementById('record-status').innerText = "🔴 듣고 있습니다... 영어로 답변해주세요.";
+    }
+  }
+
+  function submitAnswer() {
+    const userAnswer = document.getElementById('user-answer').value;
+    if (!userAnswer.trim()) return alert("답변을 입력하거나 녹음해주세요.");
+
+    showScreen('screen-result');
+    document.getElementById('eval-section').style.display = 'block'; 
+    document.getElementById('loading-result').style.display = 'block';
+    document.getElementById('result-area').style.display = 'none';
+
+    // 새로운 통신 방식으로 평가 요청
+    callBackend(
+      { action: "evaluate", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart, question: currentQuestion, userAnswer: userAnswer },
+      onResultReceived,
+      onError
+    );
+  }
+
+  function skipToModelAnswer() {
+    showScreen('screen-result');
+    document.getElementById('eval-section').style.display = 'none'; 
+    document.getElementById('loading-result').style.display = 'block';
+    document.getElementById('result-area').style.display = 'none';
+
+    // 새로운 통신 방식으로 모범 답안 요청
+    callBackend(
+      { action: "modelAnswer", targetGrade: currentGrade, question: currentQuestion },
+      onResultReceived,
+      onError
+    );
+  }
+
+  function onResultReceived(result) {
+    document.getElementById('loading-result').style.display = 'none';
+    document.getElementById('result-area').style.display = 'block';
+    
+    document.getElementById('res-score').innerText = result.Score || "";
+    document.getElementById('res-feedback').innerText = result.Feedback || "";
+    document.getElementById('res-model').innerText = result.ModelAnswer || "없음";
+    
+    let exprHtml = "";
+    if(result.KeyExpressions && result.KeyExpressions.length > 0) {
+        exprHtml = result.KeyExpressions.join("<br>• ");
+        exprHtml = "• " + exprHtml;
+    }
+    document.getElementById('res-expr').innerHTML = exprHtml;
+  }
+
+  function continueTest() { startTest(); }
+  function onError(error) { alert("오류가 발생했습니다: " + error.message); goHome(); }
+  function goHome() { showScreen('screen-login'); }
+</script>
+</body>
+</html>
