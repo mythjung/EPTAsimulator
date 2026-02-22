@@ -10,7 +10,6 @@
   <meta name="theme-color" content="#f0f4f8">
   <title>EPTA Simulator</title>
   <style>
-    /* CSS는 기존과 100% 동일하므로 생략 없이 덮어써주세요 */
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #f0f4f8; }
     body { font-family: 'Pretendard', sans-serif; color: #333; display: flex; justify-content: center; align-items: center; padding: 20px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -42,6 +41,12 @@
     .result-box { background-color: #f8f9fa; padding: 30px; border-radius: 16px; margin-top: 30px; border: 1px solid #e9ecef; }
     .result-box p { line-height: 1.7; margin-bottom: 18px; font-size: 1.05rem; }
     .badge { background: #e74c3c; color: white; font-size: 12px; padding: 3px 8px; border-radius: 12px; margin-left: 10px; vertical-align: middle; display: none; }
+    
+    /* 새로 추가된 결과창 문제 표시 영역 스타일 */
+    .res-question-area { background: #f0f7ff; padding: 20px; border-left: 6px solid #3498db; border-radius: 8px; margin-bottom: 25px; }
+    .res-question-area p { margin-top: 0; margin-bottom: 10px; color: #7f8c8d; font-size: 1rem; font-weight: bold; }
+    .res-question-text { font-size: 1.15rem; color: #2c3e50; font-weight: 600; line-height: 1.6; }
+
     @media (max-width: 600px) {
       body { padding: 0; background-color: white; align-items: flex-start; }
       .container { padding: 30px 25px; border-radius: 0; box-shadow: none; max-height: none; height: 100%; }
@@ -81,16 +86,16 @@
     </div>
   </div>
 
-<div id="screen-result" class="section">
+  <div id="screen-result" class="section">
     <h2>📊 평가 결과 <span id="prefetch-badge" class="badge">다음 문제 준비 완료!</span></h2>
     <div id="loading-result" class="loading">🤖 AI가 데이터를 분석하고 있습니다...</div>
-    
     <div id="result-area" class="result-box" style="display: none;">
       
-      <div style="background: #f0f7ff; padding: 20px; border-left: 6px solid #3498db; border-radius: 8px; margin-bottom: 25px;">
-        <p style="color:#7f8c8d; margin-top:0; margin-bottom: 10px; font-size: 1rem;"><strong>[출제된 문제]</strong></p>
-        <div id="res-question-text" style="font-size: 1.15rem; color: #2c3e50; font-weight: 600; line-height: 1.6;"></div>
+      <div class="res-question-area">
+        <p>[출제된 문제]</p>
+        <div id="res-question-text" class="res-question-text"></div>
       </div>
+      
       <div id="eval-section">
         <p><strong>🎯 평가 점수:</strong> <span id="res-score" style="color: #e74c3c; font-weight: bold; font-size: 1.3rem; display: block; margin-top: 8px;"></span></p>
         <p><strong>📝 상세 피드백:</strong> <br><span id="res-feedback" style="display: block; margin-top: 8px;"></span></p>
@@ -108,16 +113,14 @@
 
 <script>
   // 👇👇 여기에 복사해 둔 GAS 웹 앱 URL을 붙여넣으세요! 👇👇
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxghhHuUuxlFrV0Qin1lbWlDvza6yq58HEjDIUT2NeU1SSKNb0AZwwAUedJpjtDzoQrZA/exec"; 
+  const GAS_API_URL = "여기에_URL을_붙여넣으세요"; 
 
   // 상태 관리 변수
   let currentEmpId = '', currentGrade = '', currentPart = '';
-  let currentQuestionData = null; // 현재 문제 세트 (질문, 모델답안, 표현)
-  
-  // 백그라운드 프리페치용 변수
+  let currentQuestionData = null; 
   let prefetchedQuestionData = null; 
   let isPrefetching = false;
-  let isWaitingForNext = false; // 사용자가 '다음 문제'를 눌렀는데 아직 로딩 중일 때 체크
+  let isWaitingForNext = false; 
   
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition; let isRecording = false;
@@ -161,10 +164,9 @@
 
     document.getElementById('part-title').innerText = currentPart + " Test 진행 중";
     
-    // 만약 백그라운드에 준비된 문제가 있고, 설정이 동일하다면 로딩 없이 즉시 시작!
     if (prefetchedQuestionData) {
       applyQuestionData(prefetchedQuestionData);
-      prefetchedQuestionData = null; // 사용했으니 비움
+      prefetchedQuestionData = null; 
       return;
     }
 
@@ -180,7 +182,6 @@
     );
   }
 
-  // 문제 화면에 뿌리기
   function applyQuestionData(data) {
     currentQuestionData = data;
     document.getElementById('loading-question').style.display = 'none';
@@ -189,12 +190,12 @@
     document.getElementById('user-answer').value = '';
     
     playQuestion();
-    document.getElementById('prefetch-badge').style.display = 'none'; // 배지 초기화
+    document.getElementById('prefetch-badge').style.display = 'none'; 
   }
 
   function playQuestion() {
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel(); // 이전 음성 취소
+      window.speechSynthesis.cancel(); 
       const utterance = new SpeechSynthesisUtterance(currentQuestionData.Question);
       utterance.lang = 'en-US'; utterance.rate = 0.9; 
       window.speechSynthesis.speak(utterance);
@@ -211,7 +212,6 @@
     }
   }
 
-  // 1. 제출 버튼: 평가는 서버에서 하되, 정답은 이미 가지고 있음
   function submitAnswer() {
     const userAnswer = document.getElementById('user-answer').value;
     if (!userAnswer.trim()) return alert("답변을 입력하거나 녹음해주세요.");
@@ -221,7 +221,6 @@
     document.getElementById('loading-result').style.display = 'block';
     document.getElementById('result-area').style.display = 'none';
 
-    // 평가 요청을 보내는 동시에, 백그라운드 프리페칭 시작
     triggerPrefetch();
 
     callBackend(
@@ -238,21 +237,27 @@
     );
   }
 
-  // 2. 모범 답안만 보기 버튼: 로딩 시간 ZERO (0초)
   function skipToModelAnswer() {
     showScreen('screen-result');
     document.getElementById('eval-section').style.display = 'none'; 
-    document.getElementById('loading-result').style.display = 'none'; // 캐시된 데이터이므로 로딩 없음
+    document.getElementById('loading-result').style.display = 'none'; 
     document.getElementById('result-area').style.display = 'block';
     
     renderModelAnswer();
-    
-    // 답안을 보는 동안 백그라운드 프리페칭 시작
     triggerPrefetch();
   }
 
+  // 👇 결과창에 데이터를 꽂아주는 핵심 함수 (문제 텍스트 표시 기능 추가 완료!)
   function renderModelAnswer() {
-    document.getElementById('res-model').innerText = currentQuestionData.ModelAnswer;
+    // 1. 문제 텍스트 표시
+    if (currentQuestionData && currentQuestionData.Question) {
+      document.getElementById('res-question-text').innerText = currentQuestionData.Question;
+    }
+    
+    // 2. 모범 답안 표시
+    document.getElementById('res-model').innerText = currentQuestionData.ModelAnswer || "없음";
+    
+    // 3. 주요 표현 표시
     let exprHtml = "";
     if(currentQuestionData.KeyExpressions && currentQuestionData.KeyExpressions.length > 0) {
         exprHtml = "• " + currentQuestionData.KeyExpressions.join("<br>• ");
@@ -260,9 +265,6 @@
     document.getElementById('res-expr').innerHTML = exprHtml;
   }
 
-  // ==========================================
-  // 백그라운드 다음 문제 프리페치 로직
-  // ==========================================
   function triggerPrefetch() {
     if (isPrefetching) return;
     isPrefetching = true;
@@ -273,13 +275,11 @@
         prefetchedQuestionData = data;
         isPrefetching = false;
         
-        // 만약 사용자가 '다음 문제'를 광클해서 기다리고 있었다면 즉시 화면 전환
         if (isWaitingForNext) {
           isWaitingForNext = false;
           applyQuestionData(prefetchedQuestionData);
           prefetchedQuestionData = null;
         } else {
-          // 조용히 준비 완료 배지만 띄워줌
           document.getElementById('prefetch-badge').style.display = 'inline-block';
         }
       }
@@ -287,21 +287,16 @@
   }
 
   function continueTest() {
-    // 1. 이미 백그라운드 로딩이 끝났다면 즉시 시작
     if (prefetchedQuestionData) {
       applyQuestionData(prefetchedQuestionData);
       prefetchedQuestionData = null;
       showScreen('screen-test');
-    } 
-    // 2. 아직 백그라운드 로딩이 진행 중이라면 로딩 화면을 보여주며 대기
-    else if (isPrefetching) {
+    } else if (isPrefetching) {
       isWaitingForNext = true;
       showScreen('screen-test');
       document.getElementById('loading-question').style.display = 'block';
       document.getElementById('question-area').style.display = 'none';
-    } 
-    // 3. 둘 다 아니면 (예외 상황) 그냥 새로 고침
-    else {
+    } else {
       startTest();
     }
   }
@@ -309,7 +304,7 @@
   function onError(error) { alert("오류가 발생했습니다: " + error.message); goHome(); }
   function goHome() { 
     showScreen('screen-login'); 
-    prefetchedQuestionData = null; // 홈으로 가면 프리페치 무효화 (파트가 바뀔 수 있으므로)
+    prefetchedQuestionData = null; 
   }
 </script>
 </body>
