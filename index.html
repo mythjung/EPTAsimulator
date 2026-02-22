@@ -10,6 +10,7 @@
   <meta name="theme-color" content="#f0f4f8">
   <title>EPTA Simulator</title>
   <style>
+    /* CSS는 기존과 100% 동일하므로 생략 없이 덮어써주세요 */
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; padding: 0; background-color: #f0f4f8; }
     body { font-family: 'Pretendard', sans-serif; color: #333; display: flex; justify-content: center; align-items: center; padding: 20px; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -40,6 +41,7 @@
     .question-box { background: #f0f7ff; padding: 25px; border-left: 6px solid #3498db; border-radius: 0 12px 12px 0; margin-bottom: 25px; font-size: 1.15rem; color: #2c3e50; font-weight: 600; line-height: 1.6; }
     .result-box { background-color: #f8f9fa; padding: 30px; border-radius: 16px; margin-top: 30px; border: 1px solid #e9ecef; }
     .result-box p { line-height: 1.7; margin-bottom: 18px; font-size: 1.05rem; }
+    .badge { background: #e74c3c; color: white; font-size: 12px; padding: 3px 8px; border-radius: 12px; margin-left: 10px; vertical-align: middle; display: none; }
     @media (max-width: 600px) {
       body { padding: 0; background-color: white; align-items: flex-start; }
       .container { padding: 30px 25px; border-radius: 0; box-shadow: none; max-height: none; height: 100%; }
@@ -53,6 +55,7 @@
 
 <div class="container">
   <h1>✈️ EPTA Simulator</h1>
+  
   <div id="screen-login" class="section active">
     <div class="form-group"><label>사번 (Employee ID)</label><input type="text" id="empId" placeholder="예: TS12345" required></div>
     <div class="form-group"><label>목표 등급</label><select id="targetGrade"><option value="4">Level 4 (Operational)</option><option value="5">Level 5 (Extended)</option><option value="6">Level 6 (Expert)</option></select></div>
@@ -62,7 +65,7 @@
 
   <div id="screen-test" class="section">
     <h2 id="part-title">Test Part</h2>
-    <div id="loading-question" class="loading">📡 AI 시험관이 문제를 출제 중입니다...</div>
+    <div id="loading-question" class="loading">📡 AI 시험관이 문제를 준비 중입니다...</div>
     <div id="question-area" style="display: none;">
       <p style="color:#7f8c8d; margin-bottom: 10px; font-size: 1.1rem;"><strong>[시험관 질문]</strong></p>
       <div id="question-text" class="question-box"></div>
@@ -73,13 +76,13 @@
       <div id="record-status" class="status"></div>
       <div class="btn-group">
         <button onclick="submitAnswer()">✅ 제출 및 평가받기</button>
-        <button onclick="skipToModelAnswer()" class="btn-secondary">💡 모범 답안만 보기</button>
+        <button onclick="skipToModelAnswer()" class="btn-secondary">💡 모범 답안 즉시 보기</button>
       </div>
     </div>
   </div>
 
   <div id="screen-result" class="section">
-    <h2>📊 평가 결과</h2>
+    <h2>📊 평가 결과 <span id="prefetch-badge" class="badge">다음 문제 준비 완료!</span></h2>
     <div id="loading-result" class="loading">🤖 AI가 데이터를 분석하고 있습니다...</div>
     <div id="result-area" class="result-box" style="display: none;">
       <div id="eval-section">
@@ -90,7 +93,7 @@
       <p style="color:#2980b9;"><strong>📘 모범 답안:</strong> <br><span id="res-model" style="font-weight:bold; display: block; margin-top: 8px; white-space: pre-wrap;"></span></p>
       <p style="color:#27ae60;"><strong>🔑 주요 암기 표현:</strong> <br><span id="res-expr" style="display: block; margin-top: 8px;"></span></p>
       <div class="btn-group">
-        <button onclick="continueTest()" class="btn-success">➡️ 다음 문제 계속</button>
+        <button onclick="continueTest()" class="btn-success">➡️ 다음 문제 바로 시작</button>
         <button onclick="goHome()" class="btn-secondary">🏠 처음으로</button>
       </div>
     </div>
@@ -101,7 +104,14 @@
   // 👇👇 여기에 복사해 둔 GAS 웹 앱 URL을 붙여넣으세요! 👇👇
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxghhHuUuxlFrV0Qin1lbWlDvza6yq58HEjDIUT2NeU1SSKNb0AZwwAUedJpjtDzoQrZA/exec"; 
 
-  let currentEmpId = ''; let currentGrade = ''; let currentPart = ''; let currentQuestion = '';
+  // 상태 관리 변수
+  let currentEmpId = '', currentGrade = '', currentPart = '';
+  let currentQuestionData = null; // 현재 문제 세트 (질문, 모델답안, 표현)
+  
+  // 백그라운드 프리페치용 변수
+  let prefetchedQuestionData = null; 
+  let isPrefetching = false;
+  let isWaitingForNext = false; // 사용자가 '다음 문제'를 눌렀는데 아직 로딩 중일 때 체크
   
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition; let isRecording = false;
@@ -122,19 +132,18 @@
     document.getElementById(screenId).classList.add('active');
   }
 
-  // === 통신 함수(Fetch API) 교체 ===
   async function callBackend(data, onSuccess, onErrorFallback) {
     try {
       const response = await fetch(GAS_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" }, // CORS 우회를 위해 text/plain 사용
-        body: JSON.stringify(data)
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, 
+        body: JSON.stringify(data), redirect: "follow"
       });
       const result = await response.json();
       if (result.status === "success") onSuccess(result.data);
       else throw new Error(result.message);
     } catch (error) {
-      onErrorFallback(error);
+      if(onErrorFallback) onErrorFallback(error);
+      else console.error(error);
     }
   }
 
@@ -145,31 +154,42 @@
     if (!currentEmpId) return alert("사번을 입력해주세요!");
 
     document.getElementById('part-title').innerText = currentPart + " Test 진행 중";
+    
+    // 만약 백그라운드에 준비된 문제가 있고, 설정이 동일하다면 로딩 없이 즉시 시작!
+    if (prefetchedQuestionData) {
+      applyQuestionData(prefetchedQuestionData);
+      prefetchedQuestionData = null; // 사용했으니 비움
+      return;
+    }
+
     showScreen('screen-test');
     document.getElementById('loading-question').style.display = 'block';
     document.getElementById('question-area').style.display = 'none';
     document.getElementById('record-status').innerText = ''; 
 
-    // 새로운 통신 방식으로 문제 생성 요청
     callBackend(
-      { action: "generate", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart },
-      onQuestionReceived,
+      { action: "generateCombo", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart },
+      applyQuestionData,
       onError
     );
   }
 
-  function onQuestionReceived(question) {
-    currentQuestion = question;
+  // 문제 화면에 뿌리기
+  function applyQuestionData(data) {
+    currentQuestionData = data;
     document.getElementById('loading-question').style.display = 'none';
     document.getElementById('question-area').style.display = 'block';
-    document.getElementById('question-text').innerText = question;
+    document.getElementById('question-text').innerText = data.Question;
     document.getElementById('user-answer').value = '';
+    
     playQuestion();
+    document.getElementById('prefetch-badge').style.display = 'none'; // 배지 초기화
   }
 
   function playQuestion() {
     if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(currentQuestion);
+      window.speechSynthesis.cancel(); // 이전 음성 취소
+      const utterance = new SpeechSynthesisUtterance(currentQuestionData.Question);
       utterance.lang = 'en-US'; utterance.rate = 0.9; 
       window.speechSynthesis.speak(utterance);
     }
@@ -185,6 +205,7 @@
     }
   }
 
+  // 1. 제출 버튼: 평가는 서버에서 하되, 정답은 이미 가지고 있음
   function submitAnswer() {
     const userAnswer = document.getElementById('user-answer').value;
     if (!userAnswer.trim()) return alert("답변을 입력하거나 녹음해주세요.");
@@ -194,47 +215,96 @@
     document.getElementById('loading-result').style.display = 'block';
     document.getElementById('result-area').style.display = 'none';
 
-    // 새로운 통신 방식으로 평가 요청
+    // 평가 요청을 보내는 동시에, 백그라운드 프리페칭 시작
+    triggerPrefetch();
+
     callBackend(
-      { action: "evaluate", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart, question: currentQuestion, userAnswer: userAnswer },
-      onResultReceived,
+      { action: "evaluateOnly", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart, questionData: currentQuestionData, userAnswer: userAnswer },
+      (result) => {
+        document.getElementById('loading-result').style.display = 'none';
+        document.getElementById('result-area').style.display = 'block';
+        
+        document.getElementById('res-score').innerText = result.Score || "";
+        document.getElementById('res-feedback').innerText = result.Feedback || "";
+        renderModelAnswer();
+      },
       onError
     );
   }
 
+  // 2. 모범 답안만 보기 버튼: 로딩 시간 ZERO (0초)
   function skipToModelAnswer() {
     showScreen('screen-result');
     document.getElementById('eval-section').style.display = 'none'; 
-    document.getElementById('loading-result').style.display = 'block';
-    document.getElementById('result-area').style.display = 'none';
-
-    // 새로운 통신 방식으로 모범 답안 요청
-    callBackend(
-      { action: "modelAnswer", targetGrade: currentGrade, question: currentQuestion },
-      onResultReceived,
-      onError
-    );
-  }
-
-  function onResultReceived(result) {
-    document.getElementById('loading-result').style.display = 'none';
+    document.getElementById('loading-result').style.display = 'none'; // 캐시된 데이터이므로 로딩 없음
     document.getElementById('result-area').style.display = 'block';
     
-    document.getElementById('res-score').innerText = result.Score || "";
-    document.getElementById('res-feedback').innerText = result.Feedback || "";
-    document.getElementById('res-model').innerText = result.ModelAnswer || "없음";
+    renderModelAnswer();
     
+    // 답안을 보는 동안 백그라운드 프리페칭 시작
+    triggerPrefetch();
+  }
+
+  function renderModelAnswer() {
+    document.getElementById('res-model').innerText = currentQuestionData.ModelAnswer;
     let exprHtml = "";
-    if(result.KeyExpressions && result.KeyExpressions.length > 0) {
-        exprHtml = result.KeyExpressions.join("<br>• ");
-        exprHtml = "• " + exprHtml;
+    if(currentQuestionData.KeyExpressions && currentQuestionData.KeyExpressions.length > 0) {
+        exprHtml = "• " + currentQuestionData.KeyExpressions.join("<br>• ");
     }
     document.getElementById('res-expr').innerHTML = exprHtml;
   }
 
-  function continueTest() { startTest(); }
+  // ==========================================
+  // 백그라운드 다음 문제 프리페치 로직
+  // ==========================================
+  function triggerPrefetch() {
+    if (isPrefetching) return;
+    isPrefetching = true;
+    
+    callBackend(
+      { action: "generateCombo", empId: currentEmpId, targetGrade: currentGrade, studyPart: currentPart },
+      (data) => {
+        prefetchedQuestionData = data;
+        isPrefetching = false;
+        
+        // 만약 사용자가 '다음 문제'를 광클해서 기다리고 있었다면 즉시 화면 전환
+        if (isWaitingForNext) {
+          isWaitingForNext = false;
+          applyQuestionData(prefetchedQuestionData);
+          prefetchedQuestionData = null;
+        } else {
+          // 조용히 준비 완료 배지만 띄워줌
+          document.getElementById('prefetch-badge').style.display = 'inline-block';
+        }
+      }
+    );
+  }
+
+  function continueTest() {
+    // 1. 이미 백그라운드 로딩이 끝났다면 즉시 시작
+    if (prefetchedQuestionData) {
+      applyQuestionData(prefetchedQuestionData);
+      prefetchedQuestionData = null;
+      showScreen('screen-test');
+    } 
+    // 2. 아직 백그라운드 로딩이 진행 중이라면 로딩 화면을 보여주며 대기
+    else if (isPrefetching) {
+      isWaitingForNext = true;
+      showScreen('screen-test');
+      document.getElementById('loading-question').style.display = 'block';
+      document.getElementById('question-area').style.display = 'none';
+    } 
+    // 3. 둘 다 아니면 (예외 상황) 그냥 새로 고침
+    else {
+      startTest();
+    }
+  }
+
   function onError(error) { alert("오류가 발생했습니다: " + error.message); goHome(); }
-  function goHome() { showScreen('screen-login'); }
+  function goHome() { 
+    showScreen('screen-login'); 
+    prefetchedQuestionData = null; // 홈으로 가면 프리페치 무효화 (파트가 바뀔 수 있으므로)
+  }
 </script>
 </body>
 </html>
